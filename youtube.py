@@ -21,7 +21,18 @@ def install_dependencies():
     if getattr(sys, "frozen", False):
         return
 
-    required = ["yt-dlp", "requests", "static-ffmpeg"]
+    # Check if ffmpeg is already in the system PATH
+    ffmpeg_in_path = shutil.which("ffmpeg") is not None
+
+    required = ["yt-dlp", "requests"]
+    if not ffmpeg_in_path:
+        required.append("static-ffmpeg")
+        print(
+            "[*] No system FFmpeg found. Adding 'static-ffmpeg' to installation list."
+        )
+    else:
+        print("[*] System FFmpeg detected. Skipping 'static-ffmpeg' dependency.")
+
     for pkg in required:
         try:
             if pkg == "yt-dlp":
@@ -31,8 +42,12 @@ def install_dependencies():
             elif pkg == "static-ffmpeg":
                 import static_ffmpeg
         except ImportError:
+            # Handle package names that differ from import names
+            install_name = pkg
             print(f"[!] {pkg} not found. Installing...")
-            subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", install_name]
+            )
 
 
 install_dependencies()
@@ -163,7 +178,9 @@ def _container_rank(cont: str) -> int:
 
 
 def _pick_best_audio(formats: list) -> dict | None:
-    audio = [f for f in formats if f.get("vcodec") == "none" and f.get("acodec") != "none"]
+    audio = [
+        f for f in formats if f.get("vcodec") == "none" and f.get("acodec") != "none"
+    ]
     return max(audio, key=lambda f: f.get("abr") or 0) if audio else None
 
 
@@ -236,7 +253,11 @@ def select_quality(url: str, proxy: str | None) -> dict:
     print()
 
     while True:
-        raw = input("  Enter number to download (or 'q' to quit, 'u' for new URL): ").strip().lower()
+        raw = (
+            input("  Enter number to download (or 'q' to quit, 'u' for new URL): ")
+            .strip()
+            .lower()
+        )
         if raw == "q":
             sys.exit(0)
         if raw == "u":
@@ -286,7 +307,10 @@ def download(selection: dict, output_dir: str = ".") -> None:
     all_sub_langs = list(manual_subs.keys()) or list(auto_subs.keys()) or []
 
     if all_sub_langs:
-        print(f"[*] Subtitles found  : {', '.join(all_sub_langs[:15])}" + (" …" if len(all_sub_langs) > 15 else ""))
+        print(
+            f"[*] Subtitles found  : {', '.join(all_sub_langs[:15])}"
+            + (" …" if len(all_sub_langs) > 15 else "")
+        )
         sub_opts = {
             "writesubtitles": bool(manual_subs),
             "writeautomaticsub": bool(auto_subs),
@@ -297,7 +321,9 @@ def download(selection: dict, output_dir: str = ".") -> None:
         print("[*] No subtitles detected.")
 
     # ── Multi-dub audio tracks ────────────────────────────────────────────────
-    audio_tracks = [f for f in formats if f.get("vcodec") == "none" and f.get("acodec") != "none"]
+    audio_tracks = [
+        f for f in formats if f.get("vcodec") == "none" and f.get("acodec") != "none"
+    ]
     unique_langs = {f.get("language") for f in audio_tracks if f.get("language")}
 
     vid_id = chosen.get("format_id", "bestvideo") if chosen else "bestvideo"
@@ -379,7 +405,9 @@ def main():
                 break
 
         except KeyboardInterrupt:
-            print("\n\n[!] Interrupted – press Ctrl+C again to exit, or Enter to retry.")
+            print(
+                "\n\n[!] Interrupted – press Ctrl+C again to exit, or Enter to retry."
+            )
             try:
                 input()
             except KeyboardInterrupt:
