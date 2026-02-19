@@ -9,6 +9,14 @@ if not exist ".venv" (
     .venv\Scripts\python.exe -m pip install -r requirements.txt
 )
 
+:: Check for system FFmpeg
+where ffmpeg >nul 2>nul
+if %ERRORLEVEL% EQU 0 (
+    echo [+] System FFmpeg detected in PATH.
+) else (
+    echo [!] No system FFmpeg found. The script will use 'static-ffmpeg' fallback.
+)
+
 :: Run the script using the virtual environment's python
 echo [*] Launching YouTube Downloader...
 .venv\Scripts\python.exe youtube.py
