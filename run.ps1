@@ -3,7 +3,7 @@
 # 1. Check for Virtual Environment
 if (-not (Test-Path ".venv")) {
     Write-Host "[*] Virtual environment not found. Creating one..." -ForegroundColor Cyan
-    python -m venv .venv
+    py -m venv .venv
     Write-Host "[*] Installing requirements..." -ForegroundColor Cyan
     & .venv\Scripts\python.exe -m pip install -r requirements.txt
 }

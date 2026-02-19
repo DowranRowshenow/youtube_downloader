@@ -55,25 +55,35 @@ install_dependencies()
 import yt_dlp
 import requests
 
-try:
-    import static_ffmpeg
-
-    # This adds the static-ffmpeg binaries to the environment PATH
-    static_ffmpeg.add_paths()
-except ImportError:
-    static_ffmpeg = None
-
 requests.packages.urllib3.disable_warnings()  # suppress InsecureRequestWarning
+
+# ── FFmpeg Resolution ─────────────────────────────────────────────────────────
+FFMPEG_PATH = shutil.which("ffmpeg")
+
+
+def resolve_ffmpeg():
+    global FFMPEG_PATH
+    if FFMPEG_PATH:
+        # System ffmpeg found, don't even look at static-ffmpeg
+        return
+
+    try:
+        import static_ffmpeg
+
+        # Only add paths if we absolutely need to
+        static_ffmpeg.add_paths()
+        FFMPEG_PATH = shutil.which("ffmpeg")
+    except ImportError:
+        pass
+
+
+# Call this only if needed, and handle installation separately
+if not FFMPEG_PATH:
+    resolve_ffmpeg()
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 PROXY_URL = "http://127.0.0.1:8888"
 KEEP_PARAMS = {"v"}  # only keep video-ID param
-
-# Resolve FFmpeg path: check system first, then static-ffmpeg
-FFMPEG_PATH = shutil.which("ffmpeg")
-if not FFMPEG_PATH:
-    # If static_ffmpeg.add_paths() worked, shutil.which might find it now
-    FFMPEG_PATH = shutil.which("ffmpeg")
 
 # Container preference order (lower index = more preferred)
 CONTAINER_PREF = ["webm", "mp4", "mkv", "mov", "avi"]
