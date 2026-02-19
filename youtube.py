@@ -14,28 +14,51 @@ import subprocess
 import shutil
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
+
 # ── Dependency check ──────────────────────────────────────────────────────────
-try:
-    import yt_dlp
-except ImportError:
-    print("[!] yt-dlp not found. Installing...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "yt-dlp"])
-    import yt_dlp
+def install_dependencies():
+    # If running as a compiled EXE, dependencies are already bundled
+    if getattr(sys, "frozen", False):
+        return
+
+    required = ["yt-dlp", "requests", "static-ffmpeg"]
+    for pkg in required:
+        try:
+            if pkg == "yt-dlp":
+                import yt_dlp
+            elif pkg == "requests":
+                import requests
+            elif pkg == "static-ffmpeg":
+                import static_ffmpeg
+        except ImportError:
+            print(f"[!] {pkg} not found. Installing...")
+            subprocess.check_call([sys.executable, "-m", "pip", "install", pkg])
+
+
+install_dependencies()
+
+import yt_dlp
+import requests
 
 try:
-    import requests
+    import static_ffmpeg
 
-    requests.packages.urllib3.disable_warnings()  # suppress InsecureRequestWarning
+    # This adds the static-ffmpeg binaries to the environment PATH
+    static_ffmpeg.add_paths()
 except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
-    import requests
+    static_ffmpeg = None
 
-    requests.packages.urllib3.disable_warnings()
+requests.packages.urllib3.disable_warnings()  # suppress InsecureRequestWarning
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 PROXY_URL = "http://127.0.0.1:8888"
 KEEP_PARAMS = {"v"}  # only keep video-ID param
+
+# Resolve FFmpeg path: check system first, then static-ffmpeg
 FFMPEG_PATH = shutil.which("ffmpeg")
+if not FFMPEG_PATH:
+    # If static_ffmpeg.add_paths() worked, shutil.which might find it now
+    FFMPEG_PATH = shutil.which("ffmpeg")
 
 # Container preference order (lower index = more preferred)
 CONTAINER_PREF = ["webm", "mp4", "mkv", "mov", "avi"]
