@@ -24,7 +24,7 @@ echo [*] Mode: OneFile
 echo [*] Name: YouTube_Downloader
 echo.
 
-.venv\Scripts\pyinstaller.exe --onefile --name "YouTube_Downloader" --icon=download.ico youtube.py
+.venv\Scripts\pyinstaller.exe --onefile --name "YouTube Downloader" --icon=download.ico youtube.py
 
 if %ERRORLEVEL% EQU 0 (
     echo.

@@ -9,6 +9,7 @@ YouTube Downloader
 """
 
 import re
+import socket
 import sys
 import subprocess
 import shutil
@@ -113,7 +114,7 @@ def clean_youtube_url(raw: str) -> str:
 
 # ── Proxy Check ───────────────────────────────────────────────────────────────
 def check_proxy(proxy_url: str, timeout: float = 3.0) -> bool:
-    """Test proxy reachability. Accepts self-signed MITM certificates."""
+    """Test proxy reachability. Uses the simple working method from the first version."""
     try:
         resp = requests.get(
             "http://www.gstatic.com/generate_204",
@@ -129,9 +130,11 @@ def check_proxy(proxy_url: str, timeout: float = 3.0) -> bool:
 def get_proxy() -> str | None:
     print(f"\n[*] Checking proxy {PROXY_URL} ...", end=" ", flush=True)
     if check_proxy(PROXY_URL):
-        print("✓ available – proxy mode (SSL verify disabled).")
+        print("✓ available – using proxy.")
         return PROXY_URL
-    print("✗ not reachable – direct mode.")
+
+    print("✗ not reachable.")
+    print("[*] Switching to direct mode.")
     return None
 
 
