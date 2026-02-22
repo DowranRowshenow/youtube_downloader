@@ -2,12 +2,10 @@
 """
 YouTube & Playlist Downloader
 - Detects Playlists automatically
-- Audio Only (MP3) option added to menu
-- WebM/MP4 video options
+- Skips unavailable/private videos automatically
+- Audio Only (MP3) or MKV Video options
 """
 
-import re
-import socket
 import sys
 import subprocess
 import shutil
@@ -46,7 +44,7 @@ if not FFMPEG_PATH:
 
 # -- Constants --
 PROXY_URL = "http://127.0.0.1:8888"
-KEEP_PARAMS = {"v", "list"}  # Keep 'list' for playlist support
+KEEP_PARAMS = {"v", "list"}
 CONTAINER_PREF = ["webm", "mp4", "mkv"]
 
 # -- URL Cleaning --
@@ -58,7 +56,6 @@ def clean_youtube_url(raw: str) -> str:
         parsed = parsed._replace(scheme="https", netloc="www.youtube.com", path="/watch", query=f"v={video_id}")
     
     params = parse_qs(parsed.query, keep_blank_values=True)
-    # If it's a playlist but no video ID, keep only 'list'
     clean = {k: v for k, v in params.items() if k in KEEP_PARAMS}
     cleaned_url = urlunparse(parsed._replace(query=urlencode(clean, doseq=True)))
     return cleaned_url
@@ -69,7 +66,7 @@ def get_proxy() -> str | None:
     try:
         resp = requests.get("http://www.gstatic.com/generate_204", 
                             proxies={"http": PROXY_URL, "https": PROXY_URL}, 
-                            timeout=2.0, verify=False)
+                            timeout=10.0, verify=False)
         if resp.status_code in (200, 204):
             print("✓ available.")
             return PROXY_URL
@@ -78,7 +75,12 @@ def get_proxy() -> str | None:
     return None
 
 def _make_base_opts(proxy: str | None) -> dict:
-    opts = {"quiet": True, "no_warnings": True, "logger": None}
+    opts = {
+        "quiet": False,  # Changed to False so you see which videos are being skipped
+        "no_warnings": False,
+        "ignoreerrors": True,  # THIS SKIPS UNAVAILABLE VIDEOS
+        "logger": None,
+    }
     if proxy:
         opts["proxy"] = proxy
         opts["nocheckcertificate"] = True
@@ -88,22 +90,32 @@ def _make_base_opts(proxy: str | None) -> dict:
 def select_quality(url: str, proxy: str | None):
     print("\n[*] Fetching information …")
     try:
-        with yt_dlp.YoutubeDL(_make_base_opts(proxy)) as ydl:
+        # For playlist extraction, we use flat_playlist to quickly get titles
+        # and ignore errors if the first video is deleted.
+        fetch_opts = _make_base_opts(proxy)
+        fetch_opts.update({"extract_flat": "in_playlist"}) 
+        
+        with yt_dlp.YoutubeDL(fetch_opts) as ydl:
             info = ydl.extract_info(url, download=False)
     except Exception as e:
         print(f"[!] Error fetching info: {e}")
         return None
 
+    if not info:
+        print("[!] No data found. The URL might be broken or private.")
+        return None
+
     is_playlist = 'entries' in info
     title = info.get('title', 'Unknown')
     print(f"\n  Title    : {title}")
-    if is_playlist:
-        print(f"  Type     : PLAYLIST ({len(info['entries'])} items)")
     
-    formats = info.get('formats', [])
-    if is_playlist and not formats:
-        # Get formats from first video of playlist if top-level has none
-        formats = info['entries'][0].get('formats', [])
+    if is_playlist:
+        # Filter out 'None' entries which represent unavailable videos
+        valid_entries = [e for e in info['entries'] if e is not None]
+        print(f"  Type     : PLAYLIST ({len(valid_entries)} accessible items)")
+        formats = valid_entries[0].get('formats', []) if valid_entries else []
+    else:
+        formats = info.get('formats', [])
 
     # 1. Build Quality List
     seen = {}
@@ -120,7 +132,7 @@ def select_quality(url: str, proxy: str | None):
 
     print(f"\n  {'#':<4} {'Option':<20} {'Format':<10}")
     print("  " + "─" * 40)
-    print(f"  0    Download Audio (MP3)   [best]") # Audio option
+    print(f"  0    Download Audio (MP3)   [best]")
     
     options = [("Audio Only (MP3)", {"audio_only": True})]
     for idx, ((h, fps, ext), f) in enumerate(sorted_fmts, 1):
@@ -145,6 +157,7 @@ def run_download(selection_tuple, output_dir):
         "outtmpl": f"{output_dir}/%(playlist_title)s/%(title)s.%(ext)s" if 'entries' in info else f"{output_dir}/%(title)s.%(ext)s",
         "ffmpeg_location": FFMPEG_PATH,
         "noplaylist": False,
+        "ignoreerrors": True, # Ensure it skips errors during actual download
     })
 
     if "audio_only" in chosen:
@@ -160,7 +173,6 @@ def run_download(selection_tuple, output_dir):
     else:
         print(f"[*] Mode: Video ({label})")
         height = chosen.get('height')
-        # Selector for specific quality + best audio
         ydl_opts.update({
             "format": f"bestvideo[height<={height}]+bestaudio/best",
             "merge_output_format": "mkv",
@@ -174,7 +186,7 @@ def run_download(selection_tuple, output_dir):
 
 def main():
     print("=" * 50)
-    print(" YouTube Video & Playlist Downloader")
+    print(" YouTube Video & Playlist Downloader (Skip Errors Mode)")
     print("=" * 50)
     
     proxy = get_proxy()
@@ -194,7 +206,7 @@ def main():
             if input("\nAnother? (y/n): ").lower() != 'y': break
         except KeyboardInterrupt: break
         except Exception as e:
-            print(f"\n[!] Error: {e}")
+            print(f"\n[!] Global Error: {e}")
 
 if __name__ == "__main__":
     main()
