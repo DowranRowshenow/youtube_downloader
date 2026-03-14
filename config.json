@@ -1,0 +1,7 @@
+{
+    "proxy": "http://127.0.0.1:8888",
+    "retries": 15,
+    "fragment_retries": 15,
+    "timeout": 60,
+    "js_runtime": "deno"
+}
